@@ -24,6 +24,15 @@ export const report = {
       { label: 'POS 유지관리비', value: '2.2만원 / 월' },
     ],
   },
+  contract: {
+    registrationSn: '284840',
+    items: [
+      { label: '가맹계약기간', value: '최초 3년 · 재계약 1년', evidence: '가맹점 타입 최초 계약기간 3년, 재계약 기간 1년 (엔젤점 타입 2년)' },
+      { label: '계약 종료 후 경업금지', value: '조항 없음', evidence: '계약기간동안(계약해지의 경우 계약 잔여기간을 포함) 동일한 업종의 영업을 하는 행위를 금지 — 종료 후 제한 문구 없음' },
+      { label: '영업지역', value: '계약서에 설정·명시', evidence: '가맹계약 체결 시 영업지역을 설정하여 가맹계약서에 명시. 계약기간 중 정당한 사유 없이 영업지역 내 동일 업종 직영점·가맹점 추가 개설 안 함' },
+      { label: '최초 가맹금 구성', value: '가맹비 660만원 + 교육비 550만원', evidence: '총계 12,100천원(부가세 포함). 교육 시작 후 계약해지 시 교육비 반환 안 됨' },
+    ],
+  },
   area: {
     name: '여의도역 권역', radius: '500m', foodStores: 776, categories: 39,
     lunchAlternatives: [{ label: '백반·한정식', count: 200 }, { label: '김밥·분식', count: 29 }, { label: '구내식당', count: 13 }],
