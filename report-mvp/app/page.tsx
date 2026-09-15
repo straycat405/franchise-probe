@@ -1,128 +1,67 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  ArrowUpRight, BarChart3, BookOpen, Check, ChevronDown, CircleAlert,
-  CircleHelp, Database, FileCheck2, FileText, Gauge, Landmark, Search,
-  ShieldCheck, Store, TrendingUp, WalletCards,
-} from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowUpRight, Check, Clipboard, Database, Landmark, MapPin, Search, TrendingUp, WalletCards } from 'lucide-react';
+import { CartesianGrid, LabelList, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { calculated, report } from '../lib/ftc-latest';
 
-type MetricKey = 'sales' | 'stores' | 'cost';
-
-const won = (thousandWon: number) => {
-  const tenThousands = Math.round(thousandWon / 10);
-  const eok = Math.floor(tenThousands / 10_000);
-  const man = tenThousands % 10_000;
-  if (eok && man) return `${eok}억 ${man.toLocaleString('ko-KR')}만원`;
-  if (eok) return `${eok}억원`;
-  return `${man.toLocaleString('ko-KR')}만원`;
-};
-
-const metrics: Record<MetricKey, {
-  label: string; short: string; value: string; note: string;
-  description: string; tone: 'positive' | 'watch'; icon: typeof Gauge;
-}> = {
-  sales: {
-    label: '점포 매출', short: '2025년 점포당 평균매출',
-    value: won(report.sales.averageStoreSalesThousandWon),
-    note: `${report.sales.reportingStores}개 점포 기준`,
-    description: `3.3㎡당 평균매출은 ${won(report.sales.averageSalesPer3_3SqmThousandWon)}입니다. 평균매출은 이익이나 예상수익이 아닙니다.`,
-    tone: 'positive', icon: BarChart3,
-  },
-  stores: {
-    label: '점포 흐름', short: '2025년 가맹점 수', value: `${report.stores.yearly[2].stores}개`,
-    note: `전년 대비 +${calculated.storeChange}개`,
-    description: `2025년 신규 5개, 계약해지 4개로 순증 ${calculated.storeChange}개입니다. 단기 확장과 이탈이 동시에 나타났습니다.`,
-    tone: 'positive', icon: Store,
-  },
-  cost: {
-    label: '진입 부담', short: '정보공개서상 창업비용 합계',
-    value: won(report.startupCost.disclosedTotalThousandWon),
-    note: `${report.startupCost.referenceAreaSqm}㎡ 기준`,
-    description: '가맹비·교육비·보증금·기타비용과 인테리어 비용의 공개 합계입니다. 임대차비용과 별도 공사는 포함되지 않을 수 있습니다.',
-    tone: 'watch', icon: WalletCards,
-  },
-};
-
+const eok = (thousandWon: number) => `${(thousandWon / 100_000).toFixed(2).replace(/\.00$/, '')}억원`;
+const man = (thousandWon: number) => `${(thousandWon / 10).toLocaleString('ko-KR')}만원`;
 const questions = [
-  '평균매출 산정 대상 8개 점포의 영업개월 수와 지역별 매출 편차를 확인할 수 있나요?',
-  '2025년 신규개점 5개와 계약해지 4개의 사유, 해지 점포의 평균 영업기간은 얼마인가요?',
-  '기타비용 4,543만원의 세부 항목과 임대보증금·권리금·철거·추가공사 등 제외 비용은 무엇인가요?',
+  '2024년 계약해지 33건의 사유와 평균 영업기간을 확인할 수 있나요?',
+  '여의도역 후보지의 영업지역 설정 기준과 인근 출점 계획은 무엇인가요?',
+  '월 정액비용 외 물류·앱·기기 관련 비용은 각각 얼마인가요?',
 ];
-
-const evidence = [
-  { title: '점포당 평균매출', value: won(report.sales.averageStoreSalesThousandWon), source: '가맹점사업자 연평균 매출액', quote: `2025년 매출 산정 가맹점 ${report.sales.reportingStores}개, 연평균 매출액 177,570천원, 3.3㎡당 10,445천원` },
-  { title: '가맹점 증감', value: `7개 → 8개`, source: '가맹점 및 직영점 현황', quote: '2025년 신규개점 5개, 계약종료 0개, 계약해지 4개, 명의변경 0개' },
-  { title: '공개 창업비용', value: won(report.startupCost.disclosedTotalThousandWon), source: '가맹점사업자의 부담', quote: '가맹비 3,300천원, 교육비 1,100천원, 보증금 1,000천원, 기타 45,430천원, 인테리어 18,480천원' },
-  { title: '가맹본부 재무', value: `매출 ${won(report.headquarters.revenueThousandWon)}`, source: '가맹본부 재무상황', quote: `2025년 영업이익 ${won(report.headquarters.operatingProfitThousandWon)}, 당기순이익 ${won(report.headquarters.netIncomeThousandWon)}, 영업이익률 ${calculated.operatingMargin.toFixed(1)}%` },
-  { title: '계약·법 위반 이력', value: '최초 2년 · 갱신 1년', source: '계약기간 및 법 위반 사실', quote: '공정위 시정조치 0건, 민사상 패소·화해 0건, 형사처벌 0건' },
+const areaTiles = [-1, 0, 1].flatMap((row) => [-1, 0, 1].map((column) => ({
+  x: 55873 + column,
+  y: 25389 + row,
+})));
+const storeTrend = report.stores.yearly.map(({ year, stores }) => ({ year: `${year}년`, stores }));
+const trendDomain = [
+  Math.floor(Math.min(...storeTrend.map(({ stores }) => stores)) / 10) * 10 - 20,
+  Math.ceil(Math.max(...storeTrend.map(({ stores }) => stores)) / 10) * 10 + 10,
 ];
-
-function StoreTrendChart() {
-  return <div className="trend-chart actual-trend" role="img" aria-label="가맹점 수 2023년 0개, 2024년 7개, 2025년 8개">
-    <svg viewBox="0 0 660 250" preserveAspectRatio="none" aria-hidden="true">
-      <defs><linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--signal)" stopOpacity=".23"/><stop offset="100%" stopColor="var(--signal)" stopOpacity="0"/></linearGradient></defs>
-      {[42,92,142,192].map(y => <line key={y} x1="44" x2="640" y1={y} y2={y} className="grid-line"/>)}
-      <path d="M62 208 L344 68 L624 48 L624 210 L62 210 Z" fill="url(#areaFill)"/>
-      <path d="M62 208 L344 68 L624 48" className="brand-line"/>
-      {[{x:62,y:208,v:0},{x:344,y:68,v:7},{x:624,y:48,v:8}].map(p => <g key={p.x}><circle cx={p.x} cy={p.y} r="5" className="brand-dot"/><text x={p.x} y={p.y-13} textAnchor="middle" className="value-label">{p.v}</text></g>)}
-      <text x="62" y="235">2023</text><text x="344" y="235" textAnchor="middle">2024</text><text x="624" y="235" textAnchor="end">2025</text>
-    </svg>
-  </div>;
-}
-
-function CostBreakdown() {
-  const items = [
-    ['가맹비', report.startupCost.franchiseFeeThousandWon, 'fee'],
-    ['교육비', report.startupCost.trainingFeeThousandWon, 'training'],
-    ['보증금', report.startupCost.depositThousandWon, 'deposit'],
-    ['기타비용', report.startupCost.otherCostThousandWon, 'other'],
-    ['인테리어', report.startupCost.interiorThousandWon, 'interior'],
-  ] as const;
-  return <div className="cost-breakdown">
-    <div className="cost-total"><span>공개 합계</span><strong>{won(report.startupCost.disclosedTotalThousandWon)}</strong><small>{report.startupCost.referenceAreaSqm}㎡ 기준</small></div>
-    <div className="cost-stack" aria-label="공개 창업비용 구성">{items.map(([name,value,key]) => <span key={key} className={key} style={{width:`${value / report.startupCost.disclosedTotalThousandWon * 100}%`}} title={`${name} ${won(value)}`}/>)}</div>
-    <div className="cost-legend">{items.map(([name,value,key]) => <div key={key}><i className={key}/><span>{name}</span><b>{won(value)}</b></div>)}</div>
-  </div>;
-}
 
 export default function Home() {
-  const [activeMetric, setActiveMetric] = useState<MetricKey>('sales');
-  const [copiedQuestion, setCopiedQuestion] = useState<number | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
+  const [searchStatus, setSearchStatus] = useState('');
+  const [areaSqm, setAreaSqm] = useState(40);
+  const normalizedAreaSqm = Number.isFinite(areaSqm) && areaSqm > 0 ? areaSqm : 1;
+  const baseScenarioThousandWon = report.sales.seoulAveragePerPyeongThousandWon * (normalizedAreaSqm / 3.3) * report.scenario.yeouidoMarketMultiplier;
+  const revenueScenarios = [
+    { label: '보수', value: baseScenarioThousandWon * 0.85, note: '기준값 -15%' },
+    { label: '기준', value: baseScenarioThousandWon, note: '입력 면적 기준' },
+    { label: '상향', value: baseScenarioThousandWon * 1.15, note: '기준값 +15%' },
+  ];
   const copyQuestion = async (question: string, index: number) => {
     await navigator.clipboard.writeText(question);
-    setCopiedQuestion(index);
+    setCopied(index);
+    window.setTimeout(() => setCopied(null), 1600);
   };
 
-  return <main className="min-h-screen bg-background text-foreground">
-    <header className="topbar"><div className="shell topbar-inner"><a href="#top" className="brand-lockup" aria-label="프랜차이즈 프로브 홈"><span className="brand-mark"><Gauge/></span><span>FRANCHISE<span>PROBE</span></span></a><div className="search-shell" role="search"><Search aria-hidden="true"/><input aria-label="브랜드명 또는 가맹본부 검색" value={report.brand.name} readOnly/><kbd>⌘ K</kbd></div><div className="source-chip"><Database/> 공정위 공개자료</div></div></header>
-    <div id="top" className="shell page-shell">
-      <aside className="data-notice"><ShieldCheck/><p><b>공정위 최신 등록본 적용</b> · 최종등록 {report.source.disclosureFinalRegisteredAt} · 실적 기준 {report.source.performanceYear}년 · 확인일 {report.source.observedAt}</p><a href={report.source.url} target="_blank" rel="noreferrer">공식 원문 <ArrowUpRight/></a></aside>
+  const searchBrand = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSearchStatus(query.trim() === report.brand.name ? `${report.brand.name} 리포트를 표시 중입니다.` : '현재 시연 데이터는 한솥만 준비되어 있습니다.');
+  };
 
-      <section className="report-head"><div><div className="breadcrumb">{report.brand.category.replace(' > ', ' / ')} <span>/</span> 브랜드 분석</div><div className="title-row"><h1>{report.brand.name}</h1><Badge className="status-badge">실데이터</Badge></div><p>{report.brand.company} · 등록번호 {report.source.registrationNumber} · 가맹사업 개시 {report.brand.franchiseStartedAt}</p></div><div className="brand-picker"><Store/> 단일 브랜드 MVP</div></section>
-
-      <section className="verdict-grid" aria-labelledby="verdict-title"><div className="verdict-card"><div className="section-kicker"><ShieldCheck/> 지금 확인 가능한 결론</div><h2 id="verdict-title">실제 매출과 점포 흐름은 확인됐지만,<br/>시장 내 백분위는 아직 보류합니다.</h2><p>최신 정보공개서의 절대값을 먼저 보여줍니다. 동일 기준연도 비교표본이 최소 30개에 미달해 ‘상위 몇 %’는 표시하지 않았습니다.</p><div className="verdict-tags"><span className="good"><BarChart3/> 평균매출 {won(report.sales.averageStoreSalesThousandWon)}</span><span className="good"><TrendingUp/> 점포 전년 대비 +{calculated.storeChange}</span><span className="warn"><WalletCards/> 공개비용 {won(report.startupCost.disclosedTotalThousandWon)}</span></div></div><div className="confidence-card"><div className="confidence-head"><span>데이터 판정</span><b>원문 A</b></div><div className="confidence-meter"><i/><i/><i/><i className="off"/></div><ul><li><Check/> 최신 등록일 확인</li><li><Check/> 2025년 원문 수치 연결</li><li><Check/> 계산식 공개</li><li className="muted">— 업계 백분위 표본 부족</li></ul></div></section>
-
-      <section className="metric-section" aria-labelledby="metrics-title"><div className="section-heading"><div><span className="section-kicker"><Gauge/> 공개 수치</span><h2 id="metrics-title">비교 전에, 사실부터 정확하게</h2></div><div className="cohort-meta"><span>비교표본</span><b>한식 유효 {report.cohortAudit.usableSalesRecords}/{report.cohortAudit.minimumRequired}개</b><span title="동일한 기준연도와 업종의 유효 표본"><CircleHelp/></span></div></div>
-        <Tabs value={activeMetric} onValueChange={v => setActiveMetric(v as MetricKey)}><TabsList className="metric-tabs" aria-label="핵심 지표 선택">{(Object.entries(metrics) as [MetricKey, typeof metrics[MetricKey]][]).map(([key,m]) => { const Icon=m.icon; return <TabsTrigger key={key} value={key} className="metric-tab"><span className={`metric-icon ${m.tone}`}><Icon/></span><span className="metric-copy"><small>{m.label}</small><strong>{m.value}</strong><em>{m.note}</em></span></TabsTrigger>; })}</TabsList>
-          {(Object.keys(metrics) as MetricKey[]).map(key => { const m=metrics[key]; return <TabsContent key={key} value={key} className="metric-detail"><div><span className="detail-label">{m.short}</span><strong>{m.value}</strong><p>{m.description}</p></div><div className="audit-panel"><div><CircleAlert/><b>백분위 산출 보류</b></div><p>{report.cohortAudit.reason}</p><span>확보 {report.cohortAudit.usableSalesRecords}개</span><progress value={report.cohortAudit.usableSalesRecords} max={report.cohortAudit.minimumRequired}/><span>최소 {report.cohortAudit.minimumRequired}개</span></div></TabsContent>; })}
-        </Tabs>
+  return <main>
+    <header className="topbar"><div className="shell topbar-inner"><a className="brand" href="#top">FRANCHISE<span>PROBE</span></a><form className="brand-search" onSubmit={searchBrand}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="브랜드 검색" aria-label="브랜드 검색" /><button type="submit">검색</button></form><span className="topbar-tag">계약 전 확인 리포트</span></div>{searchStatus && <p className="search-status" role="status">{searchStatus}</p>}</header>
+    <div id="top" className="shell page">
+      <section className="hero"><div><p className="eyebrow"><span /> 후보 상권 · {report.area.name}</p><h1>{report.brand.name}</h1><p className="hero-copy">브랜드와 후보지를 함께 확인합니다.</p></div><div className="checked"><Check /> 공식 공개자료 확인 · {report.checkedAt}</div></section>
+      <section className="notice" aria-label="리포트 사용 안내"><Database /><p>평균매출은 이익·여의도 예상매출이 아닙니다. 상권 업소 수는 경쟁 강도를 보는 참고값입니다.</p></section>
+      <section className="quick-facts" aria-label="핵심 수치">
+        <div><p>서울 가맹점 평균매출</p><strong>{eok(report.sales.seoulAverageThousandWon)}</strong><span>{report.sales.reportingStores}개 산정 · {report.brand.performanceYear}년</span></div>
+        <div><p>가맹점 수</p><strong>{report.stores.yearly[2].stores}개</strong><span>전년 대비 +{calculated.storeChange}개</span></div>
+        <div><p>계약종료·해지</p><strong>{report.stores.expirations + report.stores.cancellations}개</strong><span>신규개점 {report.stores.openings}개 · {report.brand.performanceYear}년</span></div>
+        <div><p>최초 가맹금</p><strong>{man(report.fees.initialFranchiseFeeThousandWon)}</strong><span>가맹비·교육비 · 별도 비용 확인</span></div>
       </section>
-
-      <section className="analysis-grid"><Card className="analysis-card"><CardHeader><div><span className="section-kicker"><WalletCards/> 비용 구성</span><CardTitle>공개된 {won(report.startupCost.disclosedTotalThousandWon)}은 무엇으로 구성되나</CardTitle></div><Badge variant="outline">{report.startupCost.referenceAreaSqm}㎡</Badge></CardHeader><CardContent><CostBreakdown/><p className="chart-takeaway"><CircleAlert/> ‘기타비용’이 가장 큽니다. 포함 항목과 임대차·별도공사 등 정보공개서 밖의 비용을 견적서로 확인해야 합니다.</p></CardContent></Card>
-        <Card className="analysis-card trend-card"><CardHeader><div><span className="section-kicker"><Store/> 점포 흐름</span><CardTitle>2024년 7개 → 2025년 8개</CardTitle></div><span className="delta positive">+{calculated.storeGrowthRate.toFixed(1)}%</span></CardHeader><CardContent><div className="chart-legend"><span className="brand-key">{report.brand.name} 가맹점 수</span></div><StoreTrendChart/><div className="flow-numbers"><div><span>신규개점</span><b>{report.stores.openings2025}</b></div><div><span>계약종료</span><b>{report.stores.expirations2025}</b></div><div><span>계약해지</span><b>{report.stores.cancellations2025}</b></div><div><span>순증감</span><b className="positive">+{calculated.storeChange}</b></div></div></CardContent></Card></section>
-
-      <section className="financial-section"><div><span className="section-kicker"><Landmark/> 가맹본부 재무</span><h2>본사 숫자는 점포 수익성과 구분해서 봅니다</h2><p>2025년 재무제표 기준. 본사 매출과 이익은 개별 가맹점의 이익이 아닙니다.</p></div><div className="financial-grid"><div><span>본사 매출</span><b>{won(report.headquarters.revenueThousandWon)}</b></div><div><span>영업이익</span><b>{won(report.headquarters.operatingProfitThousandWon)}</b><small>영업이익률 {calculated.operatingMargin.toFixed(1)}%</small></div><div><span>부채 / 자본</span><b>{calculated.debtToEquity.toFixed(1)}%</b><small>부채 {won(report.headquarters.liabilitiesThousandWon)}</small></div></div></section>
-
-      <section className="question-section" aria-labelledby="questions-title"><div className="question-intro"><span className="section-kicker"><CircleAlert/> 다음 행동</span><h2 id="questions-title">이 숫자로 본사에 물어볼 질문</h2><p>공개자료가 답하지 못하는 부분을 계약 전에 확인합니다.</p></div><ol className="question-list">{questions.map((q,i) => <li key={q}><span>{i+1}</span><p>{q}</p><button onClick={() => copyQuestion(q,i)} aria-label={`${i+1}번 질문 복사`}>{copiedQuestion===i ? <Check/> : <FileCheck2/>}</button></li>)}</ol></section>
-
-      <section className="contract-section" aria-labelledby="contract-title"><div className="section-heading"><div><span className="section-kicker"><FileText/> 원문 근거</span><h2 id="contract-title">숫자마다 출처를 연결했습니다</h2></div><p>공정위 정보공개서 최종등록 {report.source.disclosureFinalRegisteredAt}</p></div><div className="evidence-list">{evidence.map((item,index) => <details key={item.title} open={index===0}><summary><span className="evidence-index">0{index+1}</span><div><small>{item.title}</small><strong>{item.value}</strong></div><span className="evidence-source">{item.source}</span><ChevronDown/></summary><div className="evidence-body"><BookOpen/><blockquote>{item.quote}</blockquote><span className="source-status"><Check/> 원문 확인</span></div></details>)}</div></section>
-
-      <footer><div className="footer-brand"><span className="brand-mark"><Gauge/></span><b>FRANCHISEPROBE</b></div><p>{report.source.authority} 정보공개서 기반 · 평균매출은 이익이나 예상수익을 의미하지 않습니다.</p><span>실데이터 MVP · {report.source.observedAt}</span></footer>
+      <section className="split-section area-section" aria-labelledby="area-title"><div className="section-title"><p className="eyebrow"><MapPin /> 후보지</p><h2 id="area-title">여의도역 500m</h2><p>점심 대체 업종을 먼저 봅니다.</p></div><div className="area-content"><div className="map-frame"><div className="tile-grid">{areaTiles.map((tile) => <img key={`${tile.x}-${tile.y}`} src={`https://tile.openstreetmap.org/16/${tile.x}/${tile.y}.png`} alt="" />)}</div><div className="radius-ring"><span>분석 범위<br />500m</span></div><small>© OpenStreetMap contributors</small></div><div className="area-summary"><div><span>음식업소</span><strong>{report.area.foodStores.toLocaleString('ko-KR')}<small>개</small></strong><em>{report.area.categories}개 업종</em></div><div className="area-list">{report.area.lunchAlternatives.map((item) => <p key={item.label}><span>{item.label}</span><b>{item.count}개</b></p>)}</div><p className="card-note">한솥의 직접 경쟁점 수가 아니라, 점심 선택지의 공개 업종 분포입니다.</p></div></div></section>
+      <section className="split-section scenario-section" aria-labelledby="scenario-title"><div className="section-title"><p className="eyebrow">가정 기반</p><h2 id="scenario-title">입점 매출 시나리오</h2><p>면적과 공개 상권 데이터를 함께 반영합니다.</p></div><div className="scenario-panel"><label className="area-input"><span>예정 전용면적</span><div><input type="number" min="1" step="1" value={areaSqm || ''} onChange={(event) => setAreaSqm(Number(event.target.value))} aria-label="예정 전용면적 제곱미터" /><b>㎡</b></div><small>{(normalizedAreaSqm / 3.3).toFixed(1)}평</small></label><div className="scenario-values">{revenueScenarios.map((scenario) => <div key={scenario.label} className={scenario.label === '기준' ? 'is-base' : ''}><span>{scenario.label}</span><strong>{eok(scenario.value)}</strong><small>{scenario.note}</small></div>)}</div><div className="scenario-formula"><p>한솥 서울 평당 평균매출 × {normalizedAreaSqm}㎡ × 여의도역 한식 상권 보정 {report.scenario.yeouidoMarketMultiplier.toFixed(2)}배</p><span>한솥 2024년 · 상권 2025년 공개자료 기준</span></div><p className="card-note">개별 매장 실매출·임대료·배달비·운영 역량은 반영하지 않은 판단 보조용 민감도 시나리오입니다.</p></div></section>
+      <section className="split-section flow-section" aria-labelledby="flow-title"><div className="section-title"><p className="eyebrow"><TrendingUp /> 점포 흐름</p><h2 id="flow-title">전년 대비 +{calculated.storeChange}개</h2><p>가맹점 수와 계약 종료·해지를 함께 봅니다.</p></div><div className="flow-card"><div className="trend-chart" aria-label="가맹점 수 2022년 767개, 2023년 793개, 2024년 811개"><ResponsiveContainer width="100%" height={180}><LineChart data={storeTrend} margin={{ top: 28, right: 24, left: -8, bottom: 4 }}><CartesianGrid vertical={false} stroke="#edf1f5" /><XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#6d7b90', fontSize: 11 }} dy={9} /><YAxis domain={trendDomain} axisLine={false} tickLine={false} tick={{ fill: '#8b97a7', fontSize: 10 }} width={35} tickCount={3} /><Tooltip cursor={{ stroke: '#cdd8e6', strokeWidth: 1 }} contentStyle={{ border: '1px solid #dfe6ef', borderRadius: 4, boxShadow: '0 6px 18px rgba(18,35,60,.10)', fontSize: 12 }} labelStyle={{ color: '#6d7b90' }} formatter={(value) => [`${value}개`, '가맹점 수']} /><Line type="linear" dataKey="stores" name="가맹점 수" stroke="#1976f3" strokeWidth={3} dot={{ r: 5, fill: '#1976f3', stroke: '#fff', strokeWidth: 3 }} activeDot={{ r: 6, fill: '#1976f3', stroke: '#fff', strokeWidth: 3 }}><LabelList dataKey="stores" position="top" offset={12} fill="#13233c" fontSize={12} fontWeight={800} /></Line></LineChart></ResponsiveContainer></div><div className="flow-numbers"><span>신규개점 <b>{report.stores.openings}개</b></span><span>계약종료·해지 <b>{report.stores.expirations + report.stores.cancellations}개</b></span><span>전년 대비 <b>+{calculated.storeChange}개</b></span></div></div></section>
+      <section className="details-grid"><article className="detail-card"><div className="icon"><WalletCards /></div><div><p className="eyebrow">계약 후 비용</p><h2>매월 확인할 항목</h2></div><ul>{report.fees.monthly.map((fee) => <li key={fee.label}><span>{fee.label}</span><b>{fee.value}</b></li>)}</ul><p className="card-note">정보공개서 표기 기준. 앱 수수료·교육 등 별도 항목도 확인하세요.</p></article><article className="detail-card"><div className="icon"><Landmark /></div><div><p className="eyebrow">가맹본부 재무</p><h2>{report.brand.company} 재무현황</h2></div><ul><li><span>매출</span><b>{eok(report.headquarters.revenueThousandWon)}</b></li><li><span>영업이익률</span><b>{calculated.operatingMargin.toFixed(1)}%</b></li><li><span>부채 / 자본</span><b>{calculated.debtToEquity.toFixed(1)}%</b></li></ul><p className="card-note">개별 가맹점의 이익·수익성을 뜻하지 않습니다.</p></article></section>
+      <section className="questions" aria-labelledby="questions-title"><div><p className="eyebrow">다음 행동</p><h2 id="questions-title">본사에 물어볼 질문</h2></div><ol>{questions.map((question, index) => <li key={question}><span>{index + 1}</span><p>{question}</p><button type="button" onClick={() => copyQuestion(question, index)} aria-label={`${index + 1}번 질문 복사`}>{copied === index ? <Check /> : <Clipboard />}</button></li>)}</ol></section>
+      <footer><div><b>출처</b><span>공정거래위원회 정보공개서 · 2024년 실적</span><span>소상공인시장진흥공단 상가(상권)정보 API · {report.checkedAt} 조회</span><span>서울시 우리마을가게 상권분석서비스 · 2025년</span></div><div className="source-links"><a href={report.source.ftcUrl} target="_blank" rel="noreferrer">정보공개서 <ArrowUpRight /></a><a href={report.source.sbizUrl} target="_blank" rel="noreferrer">상권 API <ArrowUpRight /></a><a href={report.source.seoulCommercialUrl} target="_blank" rel="noreferrer">추정매출 <ArrowUpRight /></a></div></footer>
     </div>
   </main>;
 }
